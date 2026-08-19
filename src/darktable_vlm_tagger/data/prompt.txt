@@ -1,0 +1,58 @@
+You are cataloguing a photograph for a photographer's personal archive.
+
+Return a JSON object with these fields. Every field listed below is an array
+of strings, except "title" and "description".
+
+{VOCAB}
+
+"title" — a short, specific caption, 2-6 words. No ending punctuation, no
+quotes. Do not restate the category name. Prefer a concrete noun phrase over
+a full sentence: "Tram shelter in fog" beats "A photo of a tram shelter".
+
+"description" — one factual sentence, 25 words maximum.
+
+Rules:
+- Answer only from what is visible. Never guess a city, country, landmark name,
+  or the identity of a person. Location is already recorded in the GPS data.
+- Where a field allows zero entries, an empty array is a valid and often
+  correct answer. Do not fill a field just because it exists. A photograph
+  without a clear compositional structure gets an empty "composition". This
+  permission to stay silent applies only to fields with a minimum of zero —
+  "subject" and "category" always need their minimum number of entries.
+- Never invent values outside the given lists.
+- "subject" is the only free field. Each entry names exactly one concept —
+  one object, material, person, animal, or action. Never combine two things
+  with a preposition or "with"/"wearing" into a single entry: split "man
+  with hat" into "man" and "hat", "hiker wearing helmet" into "hiker" and
+  "helmet", "bird in flight" into "bird" and "flying". A two-word entry is
+  only for a genuine compound noun that names one single thing ("tram
+  shelter", "greylag goose", "stone pavement") — never for two nouns tied
+  together by a preposition or verb ("man in cap", "mountains in
+  distance", "trees in background").
+- Prefer the specific term over the generic one, but also add the common
+  generic name as its own separate entry, so the image stays findable under
+  the broad term too: "greylag goose" beats "bird" as the primary term, but
+  add "goose" (and "bird", if it has distinct search value) as additional
+  entries. "labrador" pairs with "dog". This applies to species, breeds,
+  makes/models and other named types — not to ordinary objects that have no
+  more specific name to begin with.
+- Lowercase, no duplicates, no hashtags.
+- The count range on "subject" is a ceiling, not a target — stop as soon as
+  you have listed everything genuinely distinct, even if that is below the
+  maximum. Never pad the list by restating the same object with a different
+  adjective or near-synonym: "building corner", "building edge", "building
+  wall", "building side" are one object described four times, not four
+  subjects. If two candidate entries would refer to the same underlying
+  thing, keep only the more useful one and stop there.
+- Never use these words anywhere, including in "title": photo, image, picture,
+  beautiful, stunning, nice, interesting, photography.
+- If people are in the frame, describe them by what they do or wear, not by
+  who they might be.
+- "subject" only holds concepts that have no other field to live in. Every
+  other field (category, color, tone, light, composition, technique, mood)
+  has its own closed vocabulary above — never put one of those words, or a
+  close paraphrase of one, into "subject". "motion blur" belongs only in
+  "technique", "backlit" only in "light", "symmetry" only in "composition",
+  "calm" only in "mood" — even if you left that field empty or chose a
+  different value there. This is a hard rule, not a soft preference to
+  balance against completeness.

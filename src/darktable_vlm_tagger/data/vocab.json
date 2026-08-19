@@ -1,0 +1,85 @@
+{
+  "_comment": [
+    "Closed vocabularies for the tag namespaces. This file is the single",
+    "source of truth: both the JSON schema (enum constraints) and the",
+    "vocabulary section of the prompt are generated from it. Edit only here,",
+    "never in two places.",
+    "min/max control how many values are allowed per field. min 0 means the",
+    "model is allowed to stay silent when there is nothing notable.",
+    "subject has no vocabulary - the model generates it freely."
+  ],
+
+  "category": {
+    "min": 1, "max": 1,
+    "hint": "The single category that best classifies this photograph.",
+    "values": [
+      "abstract", "aerials", "animals", "architecture", "concert",
+      "documentary", "family", "fine art", "landscape", "macro", "nature",
+      "night", "nude", "people", "portrait", "still life",
+      "street photography", "transportation"
+    ]
+  },
+
+  "color": {
+    "min": 0, "max": 5,
+    "hint": "Colours that stand out, not necessarily the ones covering most area. Leave empty for purely black and white images; a monochrome toned image keeps its hue.",
+    "values": [
+      "blue", "green", "yellow", "orange", "red", "pink", "purple", "brown",
+      "teal", "grey", "black", "white", "beige", "gold"
+    ]
+  },
+
+  "tone": {
+    "min": 0, "max": 3,
+    "hint": "Tonal character of the finished image as a whole. monochrome means toned in a single hue; black and white means no colour at all.",
+    "values": [
+      "monochrome", "black and white", "high contrast", "low contrast",
+      "high key", "low key", "warm tones", "cool tones", "desaturated", "faded"
+    ]
+  },
+
+  "light": {
+    "min": 0, "max": 3,
+    "hint": "The lighting situation of the scene.",
+    "values": [
+      "daylight", "overcast", "soft light", "harsh light", "backlit",
+      "silhouette", "golden hour", "blue hour", "night", "low light",
+      "artificial light", "neon", "window light", "dappled light", "haze"
+    ]
+  },
+
+  "composition": {
+    "min": 0, "max": 3,
+    "hint": "Only when the compositional structure is clearly recognisable. Leave empty otherwise.",
+    "values": [
+      "leading lines", "diagonals", "symmetry", "framing", "reflection",
+      "layers", "negative space", "pattern", "close-up", "wide view",
+      "centered", "rule of thirds", "low angle", "high angle"
+    ]
+  },
+
+  "technique": {
+    "min": 0, "max": 3,
+    "hint": "Only what the exposure itself produced mechanically.",
+    "values": [
+      "motion blur", "long exposure", "shallow depth of field", "panning",
+      "grain", "multiple exposure"
+    ]
+  },
+
+  "mood": {
+    "min": 0, "max": 3,
+    "hint": "Only when the mood is unmistakable.",
+    "values": [
+      "calm", "contemplative", "melancholic", "lonely", "energetic", "tense",
+      "playful", "nostalgic", "stark", "mysterious", "somber", "dreamlike",
+      "dramatic"
+    ]
+  },
+
+  "subject": {
+    "min": 5, "max": 20,
+    "hint": "Free vocabulary: what is visible in the photograph.",
+    "values": null
+  }
+}
