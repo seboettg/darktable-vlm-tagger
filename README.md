@@ -44,6 +44,15 @@ distro's package manager (`pacman -S darktable`, `brew install darktable`,
 [in-app integration](#darktable-in-app-integration-lua) below needs —
 nothing extra to configure for that part.
 
+This tool also shells out to darktable's command-line helpers
+(`darktable-cli`, `darktable-generate-cache`) to render RAW/edited images
+the mipmap cache doesn't already cover. On Linux those are on your `$PATH`.
+On **macOS** the app bundle keeps them to itself — the tool looks inside
+`/Applications/darktable.app/Contents/MacOS` (and the same path under
+`~/Applications`) automatically. If you installed darktable somewhere else,
+point `DARKTABLE_BIN_DIR` at the directory holding those binaries, e.g.
+`export DARKTABLE_BIN_DIR=/Applications/darktable.app/Contents/MacOS`.
+
 ### 2. Python 3.11+
 
 - **Linux**: usually already installed (`python3 --version`). If not:

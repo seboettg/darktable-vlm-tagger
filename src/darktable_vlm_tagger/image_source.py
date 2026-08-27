@@ -32,8 +32,12 @@ fixed per mipmap level regardless of aspect ratio (verified: level 4 is
 normalises 4:3 (e.g. Micro Four Thirds) sources down to the same budget.
 """
 
+import os
+import shutil
 import subprocess
+import sys
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 
 from .darktable_db import ImageRecord
@@ -41,11 +45,61 @@ from .darktable_db import ImageRecord
 DEFAULT_CACHE_DIR = Path.home() / ".cache" / "darktable"
 RENDERABLE_WITHOUT_DARKTABLE = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 
+# darktable's CLI helpers are not on $PATH when it is installed as a
+# self-contained app bundle (macOS) or Windows install - only the GUI is
+# launched via Finder/Start menu. Look inside the usual bundle locations
+# before giving up. Override with DARKTABLE_BIN_DIR for anything unusual.
+_BUNDLE_BIN_DIRS = [
+    Path("/Applications/darktable.app/Contents/MacOS"),
+    Path.home() / "Applications/darktable.app/Contents/MacOS",
+    Path("C:/Program Files/darktable/bin"),
+]
+
 
 class DarktableRunningError(RuntimeError):
     """Raised when a darktable-cli render is attempted while darktable itself
     is open - it must be closed, or gmic-compressed LUTs silently fail to
     apply and the render looks plausible but wrong."""
+
+
+class DarktableNotFoundError(RuntimeError):
+    """Raised when a darktable CLI helper (darktable-cli /
+    darktable-generate-cache) cannot be located on $PATH or in a known app
+    bundle. Install darktable, or point DARKTABLE_BIN_DIR at the directory
+    holding its command-line tools."""
+
+
+@lru_cache(maxsize=None)
+def _resolve_darktable_bin(name: str) -> str | None:
+    """Absolute path to a darktable CLI helper, or None if not found.
+
+    Order: $DARKTABLE_BIN_DIR, then $PATH, then the known app-bundle dirs.
+    """
+    override = os.environ.get("DARKTABLE_BIN_DIR")
+    search_dirs = [Path(override)] if override else []
+    on_path = shutil.which(name)
+    if on_path and not override:
+        return on_path
+    for d in search_dirs + _BUNDLE_BIN_DIRS:
+        for candidate in (d / name, d / f"{name}.exe"):
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return str(candidate)
+    return on_path  # honours $PATH even when an override dir was set but empty
+
+
+def _require_darktable_bin(name: str) -> str:
+    resolved = _resolve_darktable_bin(name)
+    if resolved is None:
+        hint = ""
+        if sys.platform == "darwin":
+            hint = (" On macOS the tools ship inside darktable.app "
+                    "(Contents/MacOS) and are not on $PATH by default.")
+        raise DarktableNotFoundError(
+            f"{name!r} not found on $PATH or in a known darktable install."
+            f"{hint} Install darktable or set DARKTABLE_BIN_DIR to the "
+            "directory containing its command-line tools."
+        )
+    return resolved
 
 
 def darktable_is_running() -> bool:
@@ -59,9 +113,15 @@ def _find_mip(cache_dir: Path, image_id: int, level: int) -> Path | None:
 
 def _generate_cache(library_dir: Path, cache_dir: Path, image_id: int,
                      level: int, timeout: int = 120) -> None:
+    dt_bin = _resolve_darktable_bin("darktable-generate-cache")
+    if dt_bin is None:
+        # Best-effort step: if darktable isn't installed here, skip straight
+        # to the render fallback, which raises a clear error itself when it
+        # actually needs darktable (a RAW/edited file).
+        return
     subprocess.run(
         [
-            "darktable-generate-cache",
+            dt_bin,
             "--min-mip", str(level), "--max-mip", str(level),
             "--min-imgid", str(image_id), "--max-imgid", str(image_id),
             "--core",
@@ -106,7 +166,7 @@ def _render_with_darktable_cli(path: Path, sidecar: Path, long_edge: int,
         )
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "proxy.jpg"
-        cmd = ["darktable-cli", str(path)]
+        cmd = [_require_darktable_bin("darktable-cli"), str(path)]
         if sidecar.exists():
             cmd.append(str(sidecar))
         cmd += [
