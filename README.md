@@ -216,6 +216,23 @@ summary message and `-d lua` console output (or your system journal, e.g.
 `journalctl --user -f`, if darktable was launched via its desktop entry
 rather than a terminal).
 
+## Releasing (maintainers)
+
+Day-to-day work lands on `develop`; `main` only ever moves on a release and
+always points at the latest tagged version.
+
+[`scripts/release.sh`](scripts/release.sh) does the whole dance — bump
+`version` in `pyproject.toml` on `develop`, merge `develop` → `main`, create
+the annotated `vX.Y.Z` tag, push, and open the GitHub release with
+auto-generated notes:
+
+```bash
+scripts/release.sh 1.1.0
+```
+
+Needs a clean working tree, a local `develop` branch (`git branch develop
+main` once), and `gh` authenticated (`gh auth status`).
+
 ## Not in this version
 
 - No synonym normalisation across tagging runs.
