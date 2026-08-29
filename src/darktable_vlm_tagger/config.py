@@ -16,32 +16,64 @@ DEFAULT_CONFIG_DIR = Path.home() / ".darktable-vlm-tagger"
 
 CONFIG_TEMPLATE = """\
 # darktable-vlm-tagger configuration.
-# Any value here can be overridden per run with the matching --flag.
+#
+# Precedence for every setting: CLI flag (where one exists) > this file >
+# built-in default. Delete this file to regenerate it from the current
+# defaults; prompt.txt and vocab.json beside it are separate and untouched.
 
 [ollama]
+# Base URL of the running Ollama server.
 host = "http://localhost:11434"
+# Vision model tag Ollama should load. Must be an "-instruct" variant: the
+# bare / "-thinking" tags emit a long reasoning trace that costs roughly 10x
+# the time per image for no better tags. Also settable per run with --model.
 model = "qwen3-vl:4b-instruct"
+# Context window in tokens Ollama allocates for prompt + image + reply.
+# Too small silently truncates the instructions or the image; larger costs
+# memory and a little speed.
 num_ctx = 8192
+# Hard cap on tokens in the model's reply. The reply is one short JSON
+# object, so this only needs headroom, not size. A "length" done_reason in
+# the run log means the cap was hit and should be raised.
 num_predict = 2000
+# Seconds to wait for a single Ollama response before giving up on that image.
 timeout = 600
+# Extra attempts for an image when Ollama errors or returns unparseable /
+# empty JSON. 1 = up to two tries in total.
 retries = 1
 
 [image]
 # Long edge, in pixels, of the image actually sent to the model. This
 # matches the resolution the model and prompt were evaluated at - raising
-# it changes runtime and (untested) tagging quality.
+# it changes runtime and (untested) tagging quality. Also settable per run
+# with --target-long-edge.
 target_long_edge = 1024
-# darktable mipmap cache level to source from before downscaling (0-8).
+# darktable mipmap cache level to source the thumbnail from before
+# downscaling (0-8; higher = larger cached image, slower to generate).
+# Also settable per run with --mip-level.
 mip_level = 4
 
 [darktable]
-# Leave commented out to use ~/.config/darktable
+# darktable config directory to read library.db from. Leave commented out
+# to use ~/.config/darktable. Also settable per run with --library.
 # library = "/path/to/alternate/config/dir"
 
+[pairing]
+# Only used when the CLI is run with --pair-raw-jpeg. For a detected RAW+JPEG
+# pair this picks which file is rendered and sent to the model; the other
+# file receives an identical copy of the resulting tags, title and
+# description. "raw" | "jpeg". No CLI flag - config only.
+render_source = "raw"
+
 [output]
-# print | json | sidecar
+# Output mode when --mode is not passed on the command line:
+#   print   - write nothing; print the JSON result for each image
+#   json    - collect results into one --out file, keyed by sidecar path
+#   sidecar - write tags/title/description into each image's .xmp sidecar
 mode = "print"
 """
+
+PAIR_RENDER_SOURCES = ("raw", "jpeg")
 
 
 @dataclass(frozen=True)
@@ -55,6 +87,7 @@ class Config:
     target_long_edge: int
     mip_level: int
     library: Path | None
+    pair_render_source: str
     mode: str
     config_dir: Path
 
@@ -94,6 +127,7 @@ def load_config(config_dir: Path = DEFAULT_CONFIG_DIR, **overrides) -> Config:
     ollama = data.get("ollama", {})
     image = data.get("image", {})
     darktable = data.get("darktable", {})
+    pairing = data.get("pairing", {})
     output = data.get("output", {})
 
     library = darktable.get("library")
@@ -107,6 +141,7 @@ def load_config(config_dir: Path = DEFAULT_CONFIG_DIR, **overrides) -> Config:
         target_long_edge=image.get("target_long_edge", 1024),
         mip_level=image.get("mip_level", 4),
         library=Path(library).expanduser() if library else None,
+        pair_render_source=pairing.get("render_source", "raw"),
         mode=output.get("mode", "print"),
         config_dir=config_dir,
     )

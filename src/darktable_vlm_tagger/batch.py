@@ -23,6 +23,18 @@ def tag_paths_from_result(data: dict) -> list[str]:
     ]
 
 
+def write_result_to_sidecar(sidecar_path: Path, data: dict) -> None:
+    """Merge one model result into an XMP sidecar. Used both for the image
+    actually processed and, via the CLI, for the paired sibling of a
+    RAW+JPEG shot that shares its result (see pairing.py)."""
+    sidecar.write_tags(
+        sidecar_path,
+        tag_paths=tag_paths_from_result(data),
+        title=data.get("title", ""),
+        description=data.get("description", ""),
+    )
+
+
 def process_image(record: ImageRecord, cfg: Config, library_dir: Path,
                    schema: dict, prompt: str, closed_values: frozenset[str] = frozenset(),
                    source_file: Path | None = None, force: bool = False) -> dict:
@@ -81,12 +93,7 @@ def process_image(record: ImageRecord, cfg: Config, library_dir: Path,
 
     if cfg.mode == "sidecar":
         try:
-            sidecar.write_tags(
-                sidecar_path,
-                tag_paths=tag_paths_from_result(data),
-                title=data.get("title", ""),
-                description=data.get("description", ""),
-            )
+            write_result_to_sidecar(sidecar_path, data)
         except Exception as exc:
             return {"outcome": "error",
                     "reason": f"could not write sidecar: {exc}", "seconds": seconds}
