@@ -19,6 +19,9 @@ class ImageRecord:
     path: Path  # absolute path to the RAW/JPEG file
     version: int  # darktable duplicate/version number, 0 for the base image
     write_timestamp: int | None  # unix epoch seconds, informational only
+    group_id: int | None = None  # darktable's "same shot" group; == id for a
+    # lone image, shared by RAW+JPEG siblings. None only for a file darktable
+    # has never imported. Used by pairing.py to tag a RAW+JPEG shot once.
 
     @property
     def sidecar_path(self) -> Path:
@@ -51,7 +54,8 @@ def images_in_folder(library_dir: Path, folder: Path) -> list[ImageRecord]:
     with closing(_connect(library_dir)) as conn:
         rows = conn.execute(
             """
-            SELECT images.id, images.filename, images.version, images.write_timestamp
+            SELECT images.id, images.filename, images.version, images.write_timestamp,
+                   images.group_id
             FROM images
             JOIN film_rolls ON film_rolls.id = images.film_id
             WHERE film_rolls.folder = ?
@@ -60,7 +64,8 @@ def images_in_folder(library_dir: Path, folder: Path) -> list[ImageRecord]:
             (str(folder),),
         ).fetchall()
     return [
-        ImageRecord(id=row[0], path=folder / row[1], version=row[2], write_timestamp=row[3])
+        ImageRecord(id=row[0], path=folder / row[1], version=row[2],
+                    write_timestamp=row[3], group_id=row[4])
         for row in rows
     ]
 
@@ -75,7 +80,8 @@ def image_for_id(library_dir: Path, image_id: int) -> ImageRecord | None:
     with closing(_connect(library_dir)) as conn:
         row = conn.execute(
             """
-            SELECT images.filename, film_rolls.folder, images.version, images.write_timestamp
+            SELECT images.filename, film_rolls.folder, images.version,
+                   images.write_timestamp, images.group_id
             FROM images
             JOIN film_rolls ON film_rolls.id = images.film_id
             WHERE images.id = ?
@@ -84,9 +90,10 @@ def image_for_id(library_dir: Path, image_id: int) -> ImageRecord | None:
         ).fetchone()
     if row is None:
         return None
-    filename, folder, version, write_timestamp = row
+    filename, folder, version, write_timestamp, group_id = row
     return ImageRecord(id=image_id, path=Path(folder) / filename,
-                        version=version, write_timestamp=write_timestamp)
+                        version=version, write_timestamp=write_timestamp,
+                        group_id=group_id)
 
 
 def image_for_file(library_dir: Path, file_path: Path) -> ImageRecord:
@@ -101,7 +108,7 @@ def image_for_file(library_dir: Path, file_path: Path) -> ImageRecord:
     with closing(_connect(library_dir)) as conn:
         row = conn.execute(
             """
-            SELECT images.id, images.write_timestamp
+            SELECT images.id, images.write_timestamp, images.group_id
             FROM images
             JOIN film_rolls ON film_rolls.id = images.film_id
             WHERE film_rolls.folder = ? AND images.filename = ? AND images.version = 0
@@ -110,4 +117,5 @@ def image_for_file(library_dir: Path, file_path: Path) -> ImageRecord:
         ).fetchone()
     if row is None:
         return ImageRecord(id=None, path=file_path, version=0, write_timestamp=None)
-    return ImageRecord(id=row[0], path=file_path, version=0, write_timestamp=row[1])
+    return ImageRecord(id=row[0], path=file_path, version=0, write_timestamp=row[1],
+                        group_id=row[2])

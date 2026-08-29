@@ -128,8 +128,8 @@ On first run, `dt-vlm-tag` creates `~/.darktable-vlm-tagger/` (mirroring
 darktable's own `~/.config/darktable`) containing:
 
 - `config.toml` — model, Ollama host, target image resolution, mipmap level,
-  darktable library path, default output mode. Any value can be overridden
-  per run with the matching `--flag`.
+  darktable library path, RAW+JPEG pair render source, default output mode.
+  Most values can be overridden per run with the matching `--flag`.
 - `prompt.txt` — an editable copy of the prompt sent to the model.
 - `vocab.json` — an editable copy of the tag vocabulary.
 
@@ -167,6 +167,44 @@ carries it, so an interrupted batch run can simply be started again. Pass
 
 A JSON-lines log is written on every run to `<config-dir>/run.log`
 (configurable with `--log-file`), one entry per image, in every mode.
+
+### Pairing RAW+JPEG shots (`--pair-raw-jpeg`)
+
+Shooting RAW+JPEG leaves darktable with two images per frame. By default the
+tool renders and runs the model on both, doubling the work and sometimes
+returning slightly different tags for the same picture.
+
+`--pair-raw-jpeg` (`--folder` mode only) detects those pairs and processes
+each one **once**. The rule is deliberately strict and mechanical — no
+guessing from edit history:
+
+- both files have `version == 0` (virtual copies are never paired);
+- darktable has put them in the same group (`images.group_id`, which it does
+  automatically for RAW+JPEG on import);
+- the group is exactly one RAW plus one JPEG;
+- their filenames match apart from the extension.
+
+Anything that doesn't fit — a lone RAW, a burst of JPEGs, a manually grouped
+bracket or panorama set, a group of three or more — is tagged individually,
+exactly as without the flag.
+
+For each pair, one file is rendered and sent to the model and the **identical**
+tags, title and description are written to both (both sidecars in `--mode
+sidecar`, both keys in `--mode json`, both logged with a `paired_with` field).
+Which file is the rendered one is set in `config.toml`:
+
+```toml
+[pairing]
+render_source = "raw"   # or "jpeg"
+```
+
+The skip check (see below) looks only at the rendered file's sidecar; pass
+`--force` to rewrite both.
+
+Caveat: this assumes the RAW and the JPEG show the same picture. If you
+develop a RAW into something that genuinely differs from its out-of-camera
+JPEG (black & white, a heavy crop), don't use `--pair-raw-jpeg` for that
+folder, or re-run those frames without it.
 
 ### One-time darktable setup
 
