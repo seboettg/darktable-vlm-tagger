@@ -53,6 +53,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
                           "[pairing] render_source in config.toml (default: raw). "
                           "The skip check looks at that file's sidecar only; use "
                           "--force to rewrite both.")
+    ap.add_argument("-r", "--recursive", action="store_true",
+                     help="--folder only: also process every film roll in "
+                          "subfolders of --folder, as far as darktable has "
+                          "imported them")
     ap.add_argument("--log-file", type=Path,
                      help="JSON-lines log file (default: <config-dir>/run.log)")
     return ap
@@ -94,13 +98,24 @@ def main(argv: list[str] | None = None) -> int:
     prompt = cfg.prompt_path.read_text(encoding="utf-8").replace(
         "{VOCAB}", vocab.vocab_block(vocab_data))
 
+    recursive = bool(args.recursive and args.folder)
+    if args.recursive and not args.folder:
+        print("--recursive only applies to --folder; ignoring it.",
+              file=sys.stderr)
+
     if args.folder:
-        records = darktable_db.images_in_folder(library_dir, args.folder)
+        records = darktable_db.images_in_folder(library_dir, args.folder,
+                                                 recursive=recursive)
         if not records:
-            print(f"No images found for {args.folder} in {library_dir} - "
+            where = "in or below" if recursive else "for"
+            print(f"No images found {where} {args.folder} in {library_dir} - "
                   f"has this folder been imported into this darktable library?",
                   file=sys.stderr)
             return 1
+        if recursive:
+            rolls = len({r.path.parent for r in records})
+            print(f"{len(records)} images in {rolls} film roll(s) "
+                  f"below {args.folder.resolve()}")
     elif args.file:
         records = [darktable_db.image_for_file(library_dir, args.file)]
     else:
@@ -130,12 +145,19 @@ def main(argv: list[str] | None = None) -> int:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         results = _load_existing_results(args.out)
 
+    # Across several film rolls the bare filename doesn't say which roll an
+    # image is in, so recursive runs label it relative to --folder instead.
+    root = args.folder.resolve() if recursive else None
+
+    def display_name(rec: darktable_db.ImageRecord) -> str:
+        return str(rec.path.relative_to(root)) if root else rec.path.name
+
     total = len(units)
     exit_code = 0
     for i, unit in enumerate(units, 1):
         record = unit.primary
-        label = record.path.name if record.version == 0 else \
-            f"{record.path.name} (v{record.version})"
+        label = display_name(record) if record.version == 0 else \
+            f"{display_name(record)} (v{record.version})"
         if unit.secondaries:
             label += " +{} paired ({})".format(
                 len(unit.secondaries),
