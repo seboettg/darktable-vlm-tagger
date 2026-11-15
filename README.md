@@ -147,10 +147,14 @@ dt-vlm-tag --folder ~/Pictures/darktable/roll --mode json --out results.json
 
 # Write directly into the XMP sidecars
 dt-vlm-tag --folder ~/Pictures/darktable/roll --mode sidecar
+
+# Every film roll below a folder, in one run
+dt-vlm-tag --folder ~/Pictures/darktable --recursive --mode sidecar
 ```
 
 `--folder` processes every image darktable has imported from that exact
-folder (a film roll); `--file` processes a single image. A file that was
+folder (a film roll); add `--recursive` (`-r`) to also include every film
+roll in its subfolders. `--file` processes a single image. A file that was
 never imported into the darktable library is still handled — it just always
 falls back to a direct render instead of using the thumbnail cache.
 
@@ -167,6 +171,18 @@ carries it, so an interrupted batch run can simply be started again. Pass
 
 A JSON-lines log is written on every run to `<config-dir>/run.log`
 (configurable with `--log-file`), one entry per image, in every mode.
+
+### Processing a whole folder tree (`--recursive`)
+
+`--folder <dir> --recursive` processes every film roll whose folder is
+`<dir>` itself or anywhere below it, as darktable's library knows them —
+subfolders that were never imported are simply not part of the run. It
+prints how many images and film rolls it found before starting, and labels
+each image with its path relative to `<dir>` (`2024/tuscany/DSCF1234.RAF`).
+
+Everything else works exactly as for a single folder: `--pair-raw-jpeg`
+pairs within each shot as usual, and an interrupted run over many rolls is
+resumed by simply starting it again (see above).
 
 ### Pairing RAW+JPEG shots (`--pair-raw-jpeg`)
 

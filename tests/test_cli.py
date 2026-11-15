@@ -156,3 +156,53 @@ def test_without_flag_raw_and_jpeg_are_processed_separately(tmp_path, monkeypatc
           "--library", str(library_dir), "--config-dir", str(config_dir)])
 
     assert sorted(r.path.name for r in calls) == ["shot.JPG", "shot.RAF"]
+
+
+def test_recursive_flag_defaults_off_and_parses():
+    parser = build_arg_parser()
+    assert parser.parse_args(["--folder", "x"]).recursive is False
+    assert parser.parse_args(["--folder", "x", "--recursive"]).recursive is True
+    assert parser.parse_args(["--folder", "x", "-r"]).recursive is True
+
+
+def test_recursive_processes_subfolder_rolls_and_labels_relative(
+        tmp_path, monkeypatch, capsys):
+    root = (tmp_path / "photos").resolve()
+    library_dir = tmp_path / "darktable"
+    library_dir.mkdir()
+    conn = sqlite3.connect(library_dir / "library.db")
+    conn.execute("CREATE TABLE film_rolls (id INTEGER PRIMARY KEY, folder TEXT)")
+    conn.execute(_IMAGES_SCHEMA)
+    conn.execute("INSERT INTO film_rolls VALUES (1, ?)", (str(root / "a"),))
+    conn.execute("INSERT INTO film_rolls VALUES (2, ?)", (str(root / "b" / "c"),))
+    conn.execute("INSERT INTO images VALUES (10, 1, 'one.JPG', 0, 1000, 10)")
+    conn.execute("INSERT INTO images VALUES (11, 2, 'two.JPG', 0, 1000, 11)")
+    conn.commit()
+    conn.close()
+
+    calls = []
+    monkeypatch.setattr(batch, "process_image",
+                         lambda record, *a, **kw: calls.append(record) or {
+                             "outcome": "tagged",
+                             "data": {"subject": ["x"], "title": "", "description": ""},
+                             "seconds": 1.0})
+
+    exit_code = main(["--folder", str(root), "--recursive", "--mode", "print",
+                       "--library", str(library_dir),
+                       "--config-dir", str(tmp_path / "tool-config"),
+                       "--log-file", str(tmp_path / "run.log")])
+
+    assert exit_code == 0
+    assert [r.path for r in calls] == [root / "a" / "one.JPG",
+                                        root / "b" / "c" / "two.JPG"]
+    out = capsys.readouterr().out
+    assert "2 images in 2 film roll(s)" in out
+    assert "[1/2] a/one.JPG" in out
+    assert "[2/2] b/c/two.JPG" in out
+
+
+def test_recursive_without_folder_is_ignored_with_a_warning(tmp_path, capsys):
+    library_dir = _make_empty_library(tmp_path / "darktable")
+    main(["--image-id", "999", "--recursive", "--library", str(library_dir),
+          "--config-dir", str(tmp_path / "tool-config")])
+    assert "--recursive only applies to --folder" in capsys.readouterr().err

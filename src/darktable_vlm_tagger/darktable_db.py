@@ -43,29 +43,38 @@ def _connect(library_dir: Path) -> sqlite3.Connection:
     return sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
 
-def images_in_folder(library_dir: Path, folder: Path) -> list[ImageRecord]:
-    """All images darktable has imported from this exact folder (film roll).
+def images_in_folder(library_dir: Path, folder: Path,
+                      recursive: bool = False) -> list[ImageRecord]:
+    """All images darktable has imported from this exact folder (film roll),
+    or with `recursive` from every film roll at or below it.
 
     Files physically present in `folder` but never imported into this
     library are not returned - the caller falls back to a direct render for
     those, since there is no image id and thus no mipmap cache entry.
+
+    The recursive match is a plain string prefix on `film_rolls.folder`, not
+    LIKE: LIKE would treat `_`/`%` in folder names as wildcards and match
+    ASCII case-insensitively. The trailing slash on the prefix keeps
+    `/photos/2024` from also matching `/photos/2024-old`.
     """
     folder = folder.resolve()
+    prefix = str(folder).rstrip("/") + "/"
     with closing(_connect(library_dir)) as conn:
         rows = conn.execute(
             """
-            SELECT images.id, images.filename, images.version, images.write_timestamp,
-                   images.group_id
+            SELECT images.id, film_rolls.folder, images.filename, images.version,
+                   images.write_timestamp, images.group_id
             FROM images
             JOIN film_rolls ON film_rolls.id = images.film_id
-            WHERE film_rolls.folder = ?
-            ORDER BY images.filename, images.version
+            WHERE film_rolls.folder = :folder
+               OR (:recursive AND substr(film_rolls.folder, 1, length(:prefix)) = :prefix)
+            ORDER BY film_rolls.folder, images.filename, images.version
             """,
-            (str(folder),),
+            {"folder": str(folder), "recursive": recursive, "prefix": prefix},
         ).fetchall()
     return [
-        ImageRecord(id=row[0], path=folder / row[1], version=row[2],
-                    write_timestamp=row[3], group_id=row[4])
+        ImageRecord(id=row[0], path=Path(row[1]) / row[2], version=row[3],
+                    write_timestamp=row[4], group_id=row[5])
         for row in rows
     ]
 
